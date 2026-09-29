@@ -1,0 +1,16 @@
+# Lightweight set for running on Windows without Docker (SQLite).
+# Ranges (not pins) so pip can pick versions that ship pre-built wheels for your Python;
+# start-windows.bat installs with --only-binary so nothing is compiled on your machine.
+# No pandas/numpy: the indicator engine is plain Python.
+fastapi>=0.115,<1
+uvicorn>=0.34
+sqlalchemy>=2.0.36,<2.1
+alembic>=1.14
+pydantic>=2.10,<3
+pydantic-settings>=2.7,<3
+email-validator>=2.2
+pwdlib[argon2]>=0.2.1
+pyjwt>=2.10
+slowapi>=0.1.9
+httpx>=0.28
+tzdata>=2024.1  # Windows has no built-in time-zone database; needed for exchange calendars
