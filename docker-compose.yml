@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-hss}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hss}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hss}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hss}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+volumes:
+  pgdata:
