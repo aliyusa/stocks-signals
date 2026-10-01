@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+backend/test.db
+node_modules/
+frontend/dist/
+dev.db
+*.tsbuildinfo
+backend.log
+.venv/
+**/.venv/
+diagnostics.txt
+backend/eodhd_check.txt
