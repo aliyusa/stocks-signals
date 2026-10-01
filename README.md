@@ -75,7 +75,15 @@ Status badges: **END-OF-DAY** means the latest expected close is stored. **STALE
 - **Signals:** the latest stored signal per stock.
 - **Settings → Setup score weights:** change the category weights; signals recompute on the next view or scan.
 - The market rule uses the S&P 500 for US stocks. NGX stocks show the market regime as unavailable until an NGX index symbol is set in `INDEX_SYMBOLS`.
-- SELL / EXIT and HOLD need an open position, so they arrive with the portfolio in Phase 5. Shariah status stays NOT SCREENED until Phase 4.
+- SELL / EXIT and HOLD need an open position, so they arrive with the portfolio in Phase 5.
+
+## Shariah screening (Phase 4)
+
+- **Stock page → Shariah screening:** the status under your default methodology, a "Why?" breakdown of every business and ratio test with the figures used, the data date and source, and dividend purification per share.
+- **Screening inputs** on the same page: business activities (mark the primary one), fundamentals typed in from published statements with a source reference, a manual review flag, and external screens such as the NGX Lotus Islamic Index.
+- **Shariah Screening page:** every stock in the selected market with its status and ratios. Nothing entered means NOT SCREENED, never compliant.
+- **Settings → Shariah methodologies:** copy a built-in methodology, edit its limits, denominator and excluded activities, and make it your default.
+- Enter amounts in full units, or pick "Thousands" in the form when copying from NGX reports stated in NGN '000.
 
 ## Data providers
 

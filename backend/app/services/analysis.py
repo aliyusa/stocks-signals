@@ -23,13 +23,13 @@ from app.engines.signals import (
 from app.models.entities import (
     Exchange,
     PriceHistory,
-    ShariahScreen,
     Signal,
     SignalType,
     Stock,
     Strategy,
     User,
 )
+from app.services import shariah as shariah_svc
 from app.services.prices import freshness
 
 DEFAULT_STRATEGY = "Default setup score"
@@ -84,10 +84,10 @@ def market_regime(db: Session, market: str) -> dict | None:
     return out
 
 
-def shariah_status(db: Session, stock_id: int) -> str | None:
-    s = db.scalar(select(ShariahScreen).where(ShariahScreen.stock_id == stock_id)
-                  .order_by(ShariahScreen.computed_at.desc()).limit(1))
-    return s.status.value if s else None
+def shariah_status(db: Session, stock: Stock, user: User | None) -> str | None:
+    """Current status under the user's chosen methodology; None when nothing has been entered yet."""
+    st = shariah_svc.status_for(db, stock, shariah_svc.user_methodology(db, user))
+    return None if st == "NOT_SCREENED" else st
 
 
 def analyze(db: Session, stock: Stock, user: User | None = None, persist: bool = True,
@@ -103,7 +103,7 @@ def analyze(db: Session, stock: Stock, user: User | None = None, persist: bool =
         rg = market_regime(db, market)
         if regime_cache is not None:
             regime_cache[market] = rg
-    sh = shariah_status(db, stock.id)
+    sh = shariah_status(db, stock, user)
     status, note = freshness(stock, bars[-1]["t"])
     extra = [f"Price data is {status.value.replace('_', '-')}: {note}"] if status.value == "STALE" and note else []
     key = (stock.id, bars[-1]["t"], len(bars), json.dumps(strat.weights, sort_keys=True),

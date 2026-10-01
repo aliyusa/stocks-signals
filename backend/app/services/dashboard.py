@@ -13,16 +13,16 @@ from app.models.entities import (
     DataSource,
     DataStatus,
     Exchange,
-    ShariahScreen,
-    ShariahStatus,
     Signal,
     SignalType,
     Stock,
+    User,
     Watchlist,
     WatchlistStock,
 )
 from app.providers.registry import ProviderRegistry
 from app.schemas.common import DataPoint
+from app.services import shariah as shariah_svc
 from app.services.prices import quote, refresh_bars
 
 log = logging.getLogger("hss.dashboard")
@@ -102,27 +102,16 @@ def _configured(registry: ProviderRegistry, code: str) -> bool:
     return bool(p and p.is_configured())
 
 
-def _latest_screens_subq():
-    return (
-        select(ShariahScreen.stock_id, func.max(ShariahScreen.computed_at).label("mx"))
-        .group_by(ShariahScreen.stock_id)
-        .subquery()
-    )
-
-
 def build_dashboard(db: Session, user_id: int, registry: ProviderRegistry | None = None) -> dict:
     registry = registry or ProviderRegistry(db=db)
     since = datetime.now(UTC) - timedelta(days=7)
 
-    latest = _latest_screens_subq()
-    compliant_ids = select(ShariahScreen.stock_id).join(
-        latest, (ShariahScreen.stock_id == latest.c.stock_id) & (ShariahScreen.computed_at == latest.c.mx)
-    ).where(ShariahScreen.status == ShariahStatus.COMPLIANT)
+    compliant_ids = shariah_svc.compliant_stock_ids(db, db.get(User, user_id))
 
     setups_q = (
         select(Signal)
         .where(Signal.created_at >= since, Signal.signal_type.in_([SignalType.BUY_SETUP, SignalType.WATCHLIST]))
-        .where(Signal.stock_id.in_(compliant_ids))
+        .where(Signal.stock_id.in_(compliant_ids or {-1}))
         .order_by(Signal.score.desc().nullslast())
         .limit(20)
     )
@@ -139,7 +128,7 @@ def build_dashboard(db: Session, user_id: int, registry: ProviderRegistry | None
     universe = db.scalar(
         select(func.count(Stock.id)).where(Stock.is_active.is_(True), Stock.instrument_type != "index")
     ) or 0
-    compliant_count = db.scalar(select(func.count()).select_from(compliant_ids.subquery())) or 0
+    compliant_count = len(compliant_ids)
 
     sources = db.scalars(select(DataSource).order_by(DataSource.kind, DataSource.name)).all()
 

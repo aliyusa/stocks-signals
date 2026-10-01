@@ -42,8 +42,8 @@ function SetupsTable({ rows, empty }: { rows: SignalRow[]; empty?: string }) {
   if (!rows.length)
     return (
       <EmptyState title="No potential Shariah-compliant setups yet">
-        Setups appear once indicators and signals run on stored prices (Phase 3) and the
-        Shariah engine has screened the stock (Phase 4). Nothing is shown until real data supports it.
+        A setup appears here only when its stock is COMPLIANT under your default methodology. Add business activities and
+        fundamentals on a stock page to screen it. Nothing is shown until real data supports it.
       </EmptyState>
     );
   return (

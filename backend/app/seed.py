@@ -48,6 +48,8 @@ SOURCES = [
      "https://eodhd.com/pricing", "Fundamentals feed from USD 59.99/month.", "eodhd_api_key"),
     ("fmp_fund", "FMP Fundamentals", SourceKind.FUNDAMENTAL, "freemium", "quarterly", None,
      "https://site.financialmodelingprep.com/pricing-plans", "Limited on free plan.", "fmp_api_key"),
+    ("manual_fund", "Manual fundamentals entry", SourceKind.FUNDAMENTAL, "manual", "manual", None, None,
+     "Figures typed in from published financial statements; each entry records its report reference.", None),
     ("manual_shariah", "Manual Shariah review", SourceKind.SHARIAH, "manual", "manual", None, None,
      "Reviewer-entered activity tags and notes.", None),
 ]
@@ -106,7 +108,8 @@ def seed(db: Session) -> None:
         src.name, src.kind, src.tier, src.frequency, src.delay_minutes = name, kind, tier, freq, delay
         src.website, src.notes = web, notes
         # Enabled only reflects configuration; status stays UNAVAILABLE until a successful fetch.
-        src.is_enabled = bool(getattr(settings, key_attr)) if key_attr else code == "csv"
+        src.is_enabled = bool(getattr(settings, key_attr)) if key_attr else code in ("csv", "manual_fund",
+                                                                                     "manual_shariah")
         db.add(src)
 
     existing_m = {m.code for m in db.scalars(select(ShariahMethodology)).all()}

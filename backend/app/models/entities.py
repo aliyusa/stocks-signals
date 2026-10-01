@@ -85,6 +85,9 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="Africa/Lagos")
     token_version: Mapped[int] = mapped_column(Integer, default=0)  # bump to revoke all sessions
+    shariah_methodology_id: Mapped[int | None] = mapped_column(
+        ForeignKey("shariah_methodologies.id", ondelete="SET NULL", use_alter=True,
+                   name="fk_users_shariah_methodology"))  # None = built-in default
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(TS)
     created_at: Mapped[datetime] = _now_col()
@@ -175,7 +178,9 @@ class Stock(Base):
     instrument_type: Mapped[str] = mapped_column(String(24), default="stock")  # stock, etf, index
     provider_symbols: Mapped[dict | None] = mapped_column(JSONType)  # {"eodhd": "DANGCEM.XNSA"}
     last_fetch_attempt_at: Mapped[datetime | None] = mapped_column(TS)  # automatic-refresh cooldown
-    activity_tags: Mapped[list | None] = mapped_column(JSONType)  # [{tag, revenue_share, source}]
+    activity_tags: Mapped[list | None] = mapped_column(JSONType)  # [{tag, label, primary, revenue_share, source}]
+    shariah_external: Mapped[list | None] = mapped_column(JSONType)  # [{source, status, as_of, url, note}]
+    shariah_review_note: Mapped[str | None] = mapped_column(Text)  # set = UNDER_REVIEW
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     listed_at: Mapped[date | None] = mapped_column(Date)
     delisted_at: Mapped[date | None] = mapped_column(Date)  # kept for survivorship-bias control
@@ -229,6 +234,9 @@ class Fundamentals(Base):
     dividend_per_share: Mapped[float | None] = mapped_column(Money)
     is_estimate: Mapped[bool] = mapped_column(Boolean, default=False)
     source_id: Mapped[int] = mapped_column(ForeignKey("data_sources.id"))
+    source_ref: Mapped[str | None] = mapped_column(String(500))  # report title, page or URL
+    note: Mapped[str | None] = mapped_column(Text)
+    entered_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     reported_at: Mapped[datetime | None] = mapped_column(TS)  # point-in-time availability
     ingested_at: Mapped[datetime] = _now_col()
 
@@ -285,6 +293,8 @@ class ShariahScreen(Base):
     fundamentals_id: Mapped[int | None] = mapped_column(ForeignKey("fundamentals.id"))
     data_as_of: Mapped[date | None] = mapped_column(Date)
     reviewer_note: Mapped[str | None] = mapped_column(Text)
+    details: Mapped[dict | None] = mapped_column(JSONType)  # full engine output for the "Why?" panel
+    inputs_digest: Mapped[str | None] = mapped_column(String(32), index=True)
     computed_at: Mapped[datetime] = _now_col()
 
 

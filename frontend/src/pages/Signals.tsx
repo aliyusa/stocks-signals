@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { fmtDate, fmtDateTime, fmtMoney } from "../lib/format";
 import { MARKETS, useMarket } from "../lib/market";
 import type { SignalListRow, SignalType } from "../lib/types";
-import { SignalBadge } from "../components/badges";
+import { ShariahBadge, SignalBadge } from "../components/badges";
 import { Card, EmptyState } from "../components/ui";
 
 const TYPES: SignalType[] = ["BUY_SETUP", "WATCHLIST", "WAIT", "AVOID"];
@@ -16,7 +16,7 @@ export default function Signals() {
   const label = MARKETS.find((m) => m.code === market)?.label ?? market;
   const q = useQuery({
     queryKey: ["signals", market, type],
-    queryFn: () => api<{ strategy: string; results: SignalListRow[] }>(`/api/signals?market=${market}${type ? `&type=${type}` : ""}`),
+    queryFn: () => api<{ strategy: string; methodology: string; results: SignalListRow[] }>(`/api/signals?market=${market}${type ? `&type=${type}` : ""}`),
   });
   const rows = q.data?.results ?? [];
 
@@ -26,7 +26,7 @@ export default function Signals() {
         <div>
           <h1 className="text-xl font-semibold">Signals · {label}</h1>
           <p className="text-xs text-ink-400">
-            Latest signal per stock under "{q.data?.strategy ?? "…"}". A signal is stored each time a stock is opened, refreshed or scanned.
+            Latest signal per stock under "{q.data?.strategy ?? "…"}". A signal is stored each time a stock is opened, refreshed or scanned. Shariah status uses {q.data?.methodology ?? "your default methodology"}.
           </p>
         </div>
         <div className="flex flex-wrap gap-1" role="tablist" aria-label="Signal type">
@@ -48,7 +48,7 @@ export default function Signals() {
           <div className="-mx-4 -my-4 overflow-x-auto">
             <table className="w-full min-w-[900px] text-sm [&_td]:whitespace-nowrap">
               <thead className="text-left text-[11px] uppercase tracking-wider text-ink-500">
-                <tr>{["Stock", "Signal", "Score", "Coverage", "Entry zone", "Stop", "Target 1", "R:R", "Data as of", "Computed", "Top warning"].map((h) => <th key={h} className="px-4 py-2 font-medium">{h}</th>)}</tr>
+                <tr>{["Stock", "Signal", "Shariah", "Score", "Coverage", "Entry zone", "Stop", "Target 1", "R:R", "Data as of", "Computed", "Top warning"].map((h) => <th key={h} className="px-4 py-2 font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-ink-800">
                 {rows.map((r) => (
@@ -58,6 +58,7 @@ export default function Signals() {
                       <p className="max-w-[180px] truncate text-[11px] text-ink-400">{r.name}</p>
                     </td>
                     <td className="px-4 py-2.5"><SignalBadge type={r.signal} /></td>
+                    <td className="px-4 py-2.5"><ShariahBadge status={r.shariah} /></td>
                     <td className="num px-4 py-2.5">{r.score === null ? "n/a" : r.score.toFixed(0)}</td>
                     <td className="num px-4 py-2.5 text-ink-300">{r.coverage === null ? "n/a" : `${Math.round(r.coverage * 100)}%`}</td>
                     <td className="num px-4 py-2.5 text-xs">{r.entry_low === null ? "n/a" : `${fmtMoney(r.entry_low, r.currency)} to ${fmtMoney(r.entry_high, null)}`}</td>

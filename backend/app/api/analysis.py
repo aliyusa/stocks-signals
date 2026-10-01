@@ -10,6 +10,7 @@ from app.core.db import get_db
 from app.engines.signals import CATEGORY_LABELS, DEFAULT_PARAMS, DEFAULT_WEIGHTS
 from app.models.entities import Exchange, Market, PriceHistory, Signal, SignalType, Stock, Strategy, User
 from app.services import audit
+from app.services import shariah as shariah_svc
 from app.services.analysis import USER_STRATEGY, analyze, series_payload, user_strategy
 from app.services.prices import RANGES
 
@@ -33,7 +34,9 @@ def stock_analysis(mic: str, ticker: str, range: str = Query("1Y", pattern="^(1M
     if out is None:
         return {"available": False, "reason": "At least 30 daily bars are needed for analysis."}
     data, result, strat = out
+    m = shariah_svc.user_methodology(db, user)
     return {"available": True, "strategy": strat.name, "signal": result.to_dict(),
+            "shariah": {"status": shariah_svc.status_for(db, s, m), "methodology": m.name},
             "series": series_payload(data, RANGES.get(range))}
 
 
@@ -54,11 +57,13 @@ def list_signals(market: str | None = Query(None, max_length=8), type: str | Non
         except ValueError:
             raise HTTPException(422, "Unknown signal type") from None
     rows = db.scalars(q.order_by(Signal.score.desc().nullslast()).limit(limit)).unique().all()
-    return {"strategy": strat.name, "results": [_sig_row(r) for r in rows]}
+    m = shariah_svc.user_methodology(db, user)
+    return {"strategy": strat.name, "methodology": m.name,
+            "results": [_sig_row(r, shariah_svc.status_for(db, r.stock, m)) for r in rows]}
 
 
-def _sig_row(r: Signal) -> dict:
-    return {"ticker": r.stock.ticker, "name": r.stock.name, "exchange": r.stock.exchange.code,
+def _sig_row(r: Signal, shariah: str) -> dict:
+    return {"shariah": shariah, "ticker": r.stock.ticker, "name": r.stock.name, "exchange": r.stock.exchange.code,
             "currency": r.stock.currency or r.stock.exchange.currency, "signal": r.signal_type.value,
             "score": r.score, "coverage": r.coverage, "entry_low": r.entry_low, "entry_high": r.entry_high,
             "stop": r.stop, "target1": r.target1, "risk_reward": r.risk_reward, "data_as_of": r.data_as_of,
@@ -103,6 +108,7 @@ def scan(request: Request, body: ScanIn, user: User = Depends(current_user), db:
         q = q.where(Market.code == body.market)
     stocks = db.scalars(q).unique().all()
     regime_cache: dict = {}
+    meth = shariah_svc.user_methodology(db, user)
     matches, skipped = [], 0
     for s in stocks:
         out = analyze(db, s, user, regime_cache=regime_cache)
@@ -138,9 +144,8 @@ def scan(request: Request, body: ScanIn, user: User = Depends(current_user), db:
         ok &= body.max_atr_pct is None or (sn["atr_pct"] is not None and sn["atr_pct"] <= body.max_atr_pct)
         ok &= not body.exclude_illiquid or not (r.signal_type == "AVOID"
                                                 and any("Liquidity" in x for x in r.reasons))
-        sh = next((w for w in r.warnings if w.startswith("Shariah")), None)
-        shariah = "NOT_SCREENED" if sh else None
-        ok &= not body.shariah or (shariah or "NOT_SCREENED") in body.shariah
+        shariah = shariah_svc.status_for(db, s, meth)
+        ok &= not body.shariah or shariah in body.shariah
         if not ok:
             continue
         matches.append({
@@ -148,11 +153,11 @@ def scan(request: Request, body: ScanIn, user: User = Depends(current_user), db:
             "currency": s.currency or s.exchange.currency, "close": sn["close"], "as_of": r.as_of.isoformat(),
             "signal": r.signal_type, "score": r.score, "coverage": r.coverage, "rsi": sn["rsi"],
             "trend": r.timeframes.get("daily"), "volume_ratio": sn["volume_ratio"], "risk_reward": r.risk_reward,
-            "shariah": shariah or "NOT_SCREENED", "matched": reasons,
+            "shariah": shariah, "matched": reasons,
         })
     matches.sort(key=lambda m: (m["score"] is None, -(m["score"] or 0)))
     audit.record(db, "scanner.run", request, user.id, details={"filters": body.model_dump(), "matches": len(matches)})
-    return {"scanned": len(stocks), "skipped_short_history": skipped, "results": matches,
+    return {"scanned": len(stocks), "skipped_short_history": skipped, "results": matches, "methodology": meth.name,
             "note": "Only stocks with stored price history are scanned. Open a stock or refresh it to add history."}
 
 

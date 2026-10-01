@@ -1,6 +1,6 @@
 # Halal Stock Signals: Architecture and Roadmap
 
-Version 0.3 (Phase 3) · 29 Sep 2026
+Version 0.4 (Phase 4) · 01 Oct 2026
 
 Guiding principle: **DATA → ANALYSIS → SIGNAL → EXPLANATION**. The platform never places trades. Every number it shows carries a source, a timestamp, a frequency and a status. When a value is missing, the platform says "Data unavailable" and does not substitute an estimate.
 
@@ -155,15 +155,27 @@ The second preset is labelled as a total-assets preset. It does not claim to rep
 
 **Business-activity screen.** Each stock carries activity tags (manual or provider-supplied) with revenue shares where known. The prohibited list covers conventional banking and lending, conventional insurance, alcohol, gambling, pork, adult entertainment, tobacco, and weapons or defence. Each item is configurable per methodology. Islamic banks and takaful insurers are tagged separately and are not caught by the conventional finance exclusions.
 
-**Status logic:**
+**Status logic** (implemented in `engines/shariah.py`; the first match wins):
 
-- **NON-COMPLIANT**: a primary business is prohibited, or any ratio fails.
-- **QUESTIONABLE**: a ratio is within 10% of its threshold, the prohibited-revenue share is unknown but plausible, or external screeners disagree.
-- **INSUFFICIENT DATA**: any required input is missing. The platform never assumes a pass.
-- **UNDER REVIEW**: a manual flag, or fundamentals changed since the last screen.
-- **COMPLIANT**: all tests pass on data no older than the freshness limit (default 190 days).
+1. **NON-COMPLIANT**: the primary business is on the excluded list, a secondary excluded activity is at or above the income limit, or any ratio is at or above its limit.
+2. **UNDER REVIEW**: a reviewer has set a review note on the stock.
+3. **INSUFFICIENT DATA**: a required input is missing, no activity is marked primary, or the fundamentals are older than the methodology's limit (default 190 days from the period end). The platform never assumes a pass.
+4. **QUESTIONABLE**: a ratio passes but is within the questionable margin of its limit (default 10%, so 27% or more against a 30% limit), a secondary excluded activity has an unknown revenue share, or a recorded external screen says NON-COMPLIANT.
+5. **COMPLIANT**: every test passes on fresh data.
 
-Every result stores the inputs, each test's value against its threshold, the data date and the source. The UI shows this "Why?" breakdown, together with the disclaimer that methodologies differ and that users should verify compliance with a qualified Shariah scholar or a recognised screening provider. Purification (dividend × non-permissible share) is calculated where the data allows.
+A stock with nothing entered shows **NOT SCREENED**, which is never treated as compliant.
+
+**Ratio inputs.** Debt uses interest-bearing debt; if that is blank, total debt is used as a conservative stand-in and the "Why?" panel says so. The cash test counts all cash plus interest-bearing securities, again conservatively. Non-permissible income is interest income plus other non-permissible income, divided by revenue for the same period. Market capitalisation is the reported value if entered, otherwise the last stored close on or before the screening date × shares outstanding. The 36-month average uses 36 month-end closes × the current share count and is INSUFFICIENT DATA until 36 months of prices are stored.
+
+**Point in time.** A fundamentals entry is used only from its published date (or its entry date when the published date is blank), and the latest period end available on the screening date wins.
+
+**Fundamentals source.** The EODHD free plan has no fundamentals, so Phase 4 adds manual entry from published financial statements. Each entry must carry a source reference (report and page, or a link), records who entered it, and can be marked as an estimate. Every change to activities, fundamentals, reviews, external screens and methodologies is written to the audit log.
+
+**Methodology editor.** Built-in methodologies are read-only. A user can copy one, change its limits, denominator, excluded activities and freshness limit, and make it the default. The default drives the status shown on stock pages, the scanner, Signals and the dashboard, and a NON-COMPLIANT result turns the technical signal into AVOID.
+
+**Record keeping.** Each screen is stored with its full engine output. A new record is written only when the inputs or result change.
+
+Every result shows the inputs, each test's value against its limit, the data date and the source. The UI shows this "Why?" breakdown, together with the disclaimer that methodologies differ and that users should verify compliance with a qualified Shariah scholar or a recognised screening provider. Purification per share is dividend per share × the non-permissible share of revenue for the same period; purification of capital gains is not calculated.
 
 [Back to top](#contents)
 
@@ -275,7 +287,7 @@ halal-stock-signals/
 | **1** (done) | Architecture, full schema, FastAPI, auth (Argon2, JWT cookie, CSRF, rate limit, audit log), React shell with all navigation, dashboard reading real system status, Docker Compose | Register, log in and see the dashboard. Every market card shows UNAVAILABLE until a provider is configured |
 | **2** (done: EODHD) | Provider layer (EODHD done; FMP, Twelve Data, CSV pending), search, stock page, candlestick chart | Load DANGCEM from CSV or EODHD and MSFT from FMP, each with correct badges |
 | **3** (done) | Indicator engine, signal engine, market regime, scanner, Signals page, editable score weights, chart overlays and RSI/MACD panes | Unit tests against reference values; scanner returns explainable matches |
-| 4 | Shariah engine, methodology editor, "Why?" panel | Each status is reachable in tests; missing data yields INSUFFICIENT DATA |
+| **4** (done) | Shariah engine, methodology editor, "Why?" panel, manual fundamentals entry, Shariah screener | Each status is reachable in tests; missing data yields INSUFFICIENT DATA |
 | 5 | Watchlists, alerts (browser push and email), portfolio | An alert fires once per cooldown |
 | 6 | Risk calculator, backtester, strategy builder | A no-look-ahead test (shifted-future canary) passes |
 | 7 | AI assistant restricted to system data, with citations | Refuses to answer beyond the stored data |

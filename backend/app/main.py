@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
-from app.api import analysis, auth, dashboard, stocks
+from app.api import analysis, auth, dashboard, shariah, stocks
 from app.core import log_redact
 from app.core.config import get_settings
 from app.core.db import engine
@@ -53,6 +53,7 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(stocks.router)
 app.include_router(analysis.router)
+app.include_router(shariah.router)
 
 
 @app.get("/api/health", tags=["system"])

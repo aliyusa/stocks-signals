@@ -26,11 +26,12 @@ const SHARIAH: Record<ShariahStatus, [string, string]> = {
   QUESTIONABLE: ["QUESTIONABLE", "bg-amber-500/10 text-amber-300 ring-amber-500/30"],
   INSUFFICIENT_DATA: ["INSUFFICIENT DATA", "bg-ink-700/60 text-ink-300 ring-ink-500/40"],
   UNDER_REVIEW: ["UNDER REVIEW", "bg-violet-500/10 text-violet-300 ring-violet-500/30"],
+  NOT_SCREENED: ["NOT SCREENED", "bg-ink-800 text-ink-300 ring-ink-700"],
 };
 
-export function ShariahBadge({ status }: { status: ShariahStatus }) {
-  const [label, cls] = SHARIAH[status];
-  return <span className={`${base} ${cls}`}>{label}</span>;
+export function ShariahBadge({ status, title }: { status: ShariahStatus; title?: string }) {
+  const [label, cls] = SHARIAH[status] ?? SHARIAH.NOT_SCREENED;
+  return <span className={`${base} ${cls}`} title={title}>{label}</span>;
 }
 
 const SIGNAL: Record<SignalType, [string, string]> = {

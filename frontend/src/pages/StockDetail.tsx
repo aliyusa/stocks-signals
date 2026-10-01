@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 import { api } from "../lib/api";
 import { fmtCompact, fmtDate, fmtDateTime, fmtMoney, fmtPct } from "../lib/format";
-import type { AnalysisResponse, BarsResponse, StockDetail as SD } from "../lib/types";
-import { DataStatusBadge, SignalBadge } from "../components/badges";
+import type { AnalysisResponse, BarsResponse, StockDetail as SD, StockShariah } from "../lib/types";
+import { DataStatusBadge, ShariahBadge, SignalBadge } from "../components/badges";
+import ShariahPanel from "../components/ShariahPanel";
 import PriceChart, { OVERLAYS, Swatch, type OverlayKey, type PriceLevel } from "../components/PriceChart";
 import { AnalysisGrid } from "../components/AnalysisPanel";
 import { Card, EmptyState } from "../components/ui";
@@ -42,6 +43,16 @@ export default function StockDetail() {
     queryFn: () => api<AnalysisResponse>(`${base}/analysis?range=${range}`),
     enabled: detail.isSuccess && !INTRADAY.has(range),
   });
+  // Same query key as the default-methodology view in ShariahPanel, so the two share one request.
+  const shariah = useQuery({
+    queryKey: ["shariah", mic, ticker, null],
+    queryFn: () => api<StockShariah>(`${base}/shariah`),
+    enabled: detail.isSuccess,
+  });
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === "#shariah-h" && shariah.isSuccess) document.getElementById("shariah-h")?.scrollIntoView({ behavior: "smooth" });
+  }, [hash, shariah.isSuccess]);
   const refresh = useMutation({
     mutationFn: () => api<{ status: string; message: string | null }>(`${base}/refresh`, { method: "POST" }),
     onSettled: () => {
@@ -174,7 +185,7 @@ export default function StockDetail() {
           <ul className="space-y-3 text-sm">
             <li className="flex items-center justify-between gap-2">
               <span className="text-ink-300">Shariah screen</span>
-              <span className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-ink-300 ring-1 ring-ink-700">NOT YET SCREENED</span>
+              <a href="#shariah-h" className="hover:opacity-80"><ShariahBadge status={!shariah.data || shariah.data.result.not_screened ? "NOT_SCREENED" : shariah.data.result.status} title={shariah.data ? `Under ${shariah.data.result.methodology.name}` : undefined} /></a>
             </li>
             <li className="flex items-center justify-between gap-2">
               <span className="text-ink-300">Technical signal</span>
@@ -189,7 +200,8 @@ export default function StockDetail() {
           </ul>
           <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
             {analysis.data && !analysis.data.available ? analysis.data.reason + " " : ""}
-            The Shariah engine arrives in Phase 4. Until then no compliance status is implied.
+            {shariah.data ? `Shariah status under ${shariah.data.result.methodology.name}. A NON-COMPLIANT result turns the signal into AVOID. ` : ""}
+            See the Shariah screening section below for the full breakdown.
           </p>
         </Card>
 
@@ -230,6 +242,8 @@ export default function StockDetail() {
       {analysis.isLoading && <p className="text-sm text-ink-400">Computing indicators…</p>}
       {analysis.isError && <p role="alert" className="text-sm text-red-400">Analysis failed: {(analysis.error as Error).message}</p>}
       {a && sig && <AnalysisGrid s={sig} currency={d.currency} strategy={a.strategy} />}
+
+      <ShariahPanel mic={mic} ticker={ticker} currency={d.currency} />
     </div>
   );
 }

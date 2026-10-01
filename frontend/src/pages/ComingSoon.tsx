@@ -10,7 +10,6 @@ const SCOPE: Record<string, string> = {
   "/backtesting": "Walk-forward backtests with costs and slippage and no look-ahead.",
   "/strategies": "Build, save and edit rule-based strategies.",
   "/alerts": "Price, indicator, score and entry-zone alerts via browser and email.",
-  "/shariah": "Business-activity and ratio screening with the full 'Why?' breakdown.",
   "/risk": "Position sizing from account size, risk %, entry and stop.",
 };
 

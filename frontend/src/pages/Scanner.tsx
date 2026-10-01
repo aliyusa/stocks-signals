@@ -5,8 +5,8 @@ import { Radar } from "lucide-react";
 import { api } from "../lib/api";
 import { fmtDate, fmtMoney, fmtNum } from "../lib/format";
 import { MARKETS, useMarket } from "../lib/market";
-import type { ScanResponse, SignalType } from "../lib/types";
-import { SignalBadge } from "../components/badges";
+import type { ScanResponse, ShariahStatus, SignalType } from "../lib/types";
+import { ShariahBadge, SignalBadge } from "../components/badges";
 import { Card, EmptyState } from "../components/ui";
 
 type Flags = "above_sma50" | "above_sma200" | "sma50_gt_sma200" | "macd_positive" | "volume_above_avg" | "volume_spike" | "breakout" | "near_52w_high" | "exclude_illiquid";
@@ -16,6 +16,7 @@ const FLAGS: [Flags, string][] = [
   ["breakout", "Close above prior 20-day high"], ["near_52w_high", "Within 5% of 52-week high"], ["exclude_illiquid", "Exclude illiquid stocks"],
 ];
 const TYPES: SignalType[] = ["BUY_SETUP", "WATCHLIST", "WAIT", "AVOID"];
+const SHARIAH: ShariahStatus[] = ["COMPLIANT", "QUESTIONABLE", "NON_COMPLIANT", "INSUFFICIENT_DATA", "UNDER_REVIEW", "NOT_SCREENED"];
 type Nums = "min_score" | "rsi_min" | "rsi_max" | "price_min" | "price_max" | "max_atr_pct";
 const NUMS: [Nums, string, number, number][] = [
   ["min_score", "Min setup score", 0, 100], ["rsi_min", "RSI min", 0, 100], ["rsi_max", "RSI max", 0, 100],
@@ -29,12 +30,13 @@ export default function Scanner() {
     Object.fromEntries(FLAGS.map(([k]) => [k, k === "exclude_illiquid"])) as Record<Flags, boolean>);
   const [nums, setNums] = useState<Record<Nums, string>>(Object.fromEntries(NUMS.map(([k]) => [k, ""])) as Record<Nums, string>);
   const [types, setTypes] = useState<SignalType[]>([]);
+  const [shariah, setShariah] = useState<ShariahStatus[]>([]);
 
   const scan = useMutation({
     mutationFn: () => api<ScanResponse>("/api/scanner", {
       method: "POST",
       body: JSON.stringify({
-        market, signal_types: types, ...flags,
+        market, signal_types: types, shariah, ...flags,
         ...Object.fromEntries(NUMS.map(([k]) => [k, nums[k] === "" ? null : Number(nums[k])])),
       }),
     }),
@@ -82,7 +84,15 @@ export default function Scanner() {
               </label>
             ))}
           </fieldset>
-          <p className="text-[11px] text-ink-500">Shariah filters arrive with the Shariah engine in Phase 4. Every result currently shows NOT SCREENED.</p>
+          <fieldset className="flex flex-wrap gap-3">
+            <legend className="mb-1 text-[11px] uppercase tracking-wider text-ink-500">Shariah status under your default methodology (none ticked = any)</legend>
+            {SHARIAH.map((t) => (
+              <label key={t} className="inline-flex items-center gap-2 text-xs text-ink-300">
+                <input type="checkbox" className="accent-teal-500" checked={shariah.includes(t)}
+                  onChange={() => setShariah(shariah.includes(t) ? shariah.filter((x) => x !== t) : [...shariah, t])} /> <ShariahBadge status={t} />
+              </label>
+            ))}
+          </fieldset>
           <button type="submit" className="sr-only">Run scan</button>
         </form>
       </Card>
@@ -113,7 +123,7 @@ export default function Scanner() {
                       <td className="px-4 py-2.5 text-xs text-ink-300">{r.trend ?? "n/a"}</td>
                       <td className="num px-4 py-2.5">{r.volume_ratio === null ? "n/a" : `${fmtNum(r.volume_ratio, 2)}×`}</td>
                       <td className="num px-4 py-2.5">{r.risk_reward === null ? "n/a" : `${r.risk_reward.toFixed(2)} : 1`}</td>
-                      <td className="px-4 py-2.5 text-[11px] text-ink-400">{r.shariah.replace(/_/g, " ")}</td>
+                      <td className="px-4 py-2.5"><ShariahBadge status={r.shariah} /></td>
                       <td className="px-4 py-2.5 text-[11px] text-ink-400">{r.matched.join(", ") || "n/a"}</td>
                     </tr>
                   ))}
@@ -121,7 +131,7 @@ export default function Scanner() {
               </table>
             </div>
           )}
-          <p className="mt-6 text-[11px] text-ink-500">{res.note}</p>
+          <p className="mt-6 text-[11px] text-ink-500">{res.note} Shariah status uses {res.methodology}.</p>
         </Card>
       )}
     </div>
