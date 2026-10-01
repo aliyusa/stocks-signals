@@ -1,0 +1,2 @@
+# Vercel installs this file. The real list lives with the backend.
+-r backend/requirements.txt
