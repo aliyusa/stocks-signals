@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "functions": {
+    "server.py": {
+      "maxDuration": 60,
+      "includeFiles": "{frontend/dist/**,backend/alembic/**}",
+      "excludeFiles": "{frontend/node_modules/**,frontend/src/**,backend/tests/**,**/*.db,**/.venv/**}"
+    }
+  },
+  "regions": [
+    "dub1"
+  ]
+}
