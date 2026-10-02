@@ -1,6 +1,6 @@
 # Hosting on Vercel and Supabase
 
-Version 1.1 · 29 Sep 2026
+Version 1.2 · 02 Oct 2026
 
 With this setup nothing runs on your laptop. You open one web address from any device.
 
@@ -29,6 +29,8 @@ Free-tier limits to know:
 | `EODHD_API_KEY` | Your EODHD key | Yes |
 | `SECRET_KEY` | A long random string (at least 32 characters). Signs login tokens | Yes |
 | `ALLOWED_EMAILS` | `["aliyusa756@gmail.com"]`. Only these emails can register | No |
+| `CRON_SECRET` | Optional. A long random string; turns on the weekday daily job (price refresh and alert checks) | Yes |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Optional, for email alerts. Gmail: `smtp.gmail.com`, `587`, your address, a Google app password, your address | Password: yes |
 
 `ENVIRONMENT=production`, `COOKIE_SECURE=true` and the static folder are set by `server.py`. Enter the three secrets yourself; never paste them into a chat.
 

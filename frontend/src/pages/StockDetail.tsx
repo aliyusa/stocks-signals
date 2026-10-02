@@ -7,6 +7,7 @@ import { fmtCompact, fmtDate, fmtDateTime, fmtMoney, fmtPct } from "../lib/forma
 import type { AnalysisResponse, BarsResponse, StockDetail as SD, StockShariah } from "../lib/types";
 import { DataStatusBadge, ShariahBadge, SignalBadge } from "../components/badges";
 import ShariahPanel from "../components/ShariahPanel";
+import StockWorkspace from "../components/StockWorkspace";
 import PriceChart, { OVERLAYS, Swatch, type OverlayKey, type PriceLevel } from "../components/PriceChart";
 import { AnalysisGrid } from "../components/AnalysisPanel";
 import { Card, EmptyState } from "../components/ui";
@@ -78,7 +79,11 @@ export default function StockDetail() {
   const a = analysis.data?.available ? analysis.data : null;
   const sig = a?.signal;
   const levels: PriceLevel[] = [];
-  if (sig && showLevels) {
+  if (sig?.position && showLevels) {
+    levels.push({ price: sig.position.avg_entry, title: "Your entry", kind: "entry" });
+    if (sig.position.stop !== null) levels.push({ price: sig.position.stop, title: "Your stop", kind: "stop" });
+    if (sig.position.target !== null) levels.push({ price: sig.position.target, title: "Your target", kind: "target" });
+  } else if (sig && showLevels) {
     if (sig.entry_low !== null) levels.push({ price: sig.entry_low, title: "Entry low", kind: "entry" });
     if (sig.entry_high !== null) levels.push({ price: sig.entry_high, title: "Entry high", kind: "entry" });
     if (sig.stop !== null) levels.push({ price: sig.stop, title: "Stop", kind: "stop" });
@@ -110,6 +115,8 @@ export default function StockDetail() {
           </div>
         </div>
       </header>
+
+      <StockWorkspace mic={mic} ticker={ticker} name={d.name} />
 
       {refreshMsg && (
         <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">

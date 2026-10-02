@@ -386,6 +386,10 @@ class PortfolioPosition(Base):
     target: Mapped[float | None] = mapped_column(Money)
     opened_at: Mapped[date | None] = mapped_column(Date)
     note: Mapped[str | None] = mapped_column(String(500))
+    closed_at: Mapped[date | None] = mapped_column(Date)  # set = closed; kept for realised P/L
+    exit_price: Mapped[float | None] = mapped_column(Money)
+    created_at: Mapped[datetime] = _now_col()
+    stock: Mapped[Stock] = relationship()
 
 
 class Alert(Base):
@@ -399,7 +403,10 @@ class Alert(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     cooldown_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     last_triggered_at: Mapped[datetime | None] = mapped_column(TS)
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(TS)
+    state: Mapped[dict | None] = mapped_column(JSONType)  # last observed value, for change-type alerts
     created_at: Mapped[datetime] = _now_col()
+    stock: Mapped[Stock | None] = relationship()
 
 
 class AlertEvent(Base):

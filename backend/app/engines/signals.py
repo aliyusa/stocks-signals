@@ -7,8 +7,8 @@ Output contract (see docs/ARCHITECTURE.md §3):
 - rules: every rule with category, pass / fail / n/a, the measured value and a sentence
 - score: weighted, renormalised over rules that could be evaluated
 - coverage: share of total weight that could be evaluated
-- signal_type: BUY_SETUP, WATCHLIST, WAIT or AVOID (SELL_EXIT and HOLD need an open
-  position and arrive with the portfolio in Phase 5)
+- signal_type: BUY_SETUP, WATCHLIST, WAIT or AVOID; with an open position, SELL_EXIT or HOLD
+  (exit checks are listed one by one in `exit_checks`)
 - levels: entry zone, stop, targets, each with the method used; a level is omitted
   when no price structure supports it
 """
@@ -80,6 +80,8 @@ class SignalResult:
     snapshot: dict = field(default_factory=dict)
     timeframes: dict = field(default_factory=dict)
     summary: str = ""
+    exit_checks: list[dict] = field(default_factory=list)
+    position: dict | None = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -142,6 +144,7 @@ def evaluate(
     market_regime: dict | None = None,
     shariah_status: str | None = None,
     extra_warnings: list[str] | None = None,
+    position: dict | None = None,
 ) -> SignalResult:
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
     p = {**DEFAULT_PARAMS, **(params or {})}
@@ -353,8 +356,23 @@ def evaluate(
             reasons.append("Waiting for: " + ", ".join(missing))
     else:
         stype = "WAIT"
+
+    exit_checks: list[dict] = []
+    pos_out = None
+    if position:
+        exit_checks, pos_out = _exit_checks(data, i, position, shariah_status, sw, s50, s200)
+        triggered = [x for x in exit_checks if x["triggered"]]
+        reasons = []  # the entry-setup reasons do not apply to a holding
+        if triggered:
+            stype = "SELL_EXIT"
+            reasons += [f"{x['label']}: {x['detail']}" for x in triggered]
+        else:
+            stype = "HOLD"
+            reasons.append("Open position: no exit condition is met")
+        if position.get("stop") is None:
+            warnings.append("No stop is set for this position, so the stop check cannot run")
     for x in rules:
-        if x.passed:
+        if x.passed and not position:
             reasons.append(f"{x.label}" + (f" ({x.value})" if x.value else ""))
 
     if flat_share is not None and flat_share > p["flat_bar_max"]:
@@ -381,6 +399,8 @@ def evaluate(
         "low_52w": min(lo[max(0, i - 251):i + 1]), "structure": structure, "breakout": breakout,
     }
     summary = _summary(stype, score, coverage, close, prior_high, rr, entry_low, entry_high, stop, targets)
+    if position:
+        summary = _position_summary(stype, exit_checks, pos_out) + " " + summary
     return SignalResult(
         as_of=data["t"][i], close=close, signal_type=stype, score=None if score is None else round(score, 1),
         coverage=round(coverage, 3), breakdown=breakdown, rules=rules, reasons=reasons, warnings=warnings,
@@ -388,8 +408,66 @@ def evaluate(
         risk_reward=None if rr is None else round(rr, 2), level_notes=level_notes,
         supports=[{"price": s.price, "touches": s.touches} for s in supports[:3]],
         resistances=[{"price": s.price, "touches": s.touches} for s in resist[:3]],
-        snapshot=snapshot, timeframes=timeframes, summary=summary,
+        snapshot=snapshot, timeframes=timeframes, summary=summary, exit_checks=exit_checks, position=pos_out,
     )
+
+
+def _exit_checks(data, i, position, shariah_status, sw, s50, s200) -> tuple[list[dict], dict]:
+    """Each exit condition for an open position, evaluated on data up to bar i only."""
+    c, lo, rsi = data["c"], data["l"], data["rsi"]
+    close = c[i]
+    entry = float(position["avg_entry"])
+    stop = None if position.get("stop") is None else float(position["stop"])
+    target = None if position.get("target") is None else float(position["target"])
+    checks: list[dict] = []
+
+    def chk(code, label, triggered, detail):
+        checks.append({"code": code, "label": label, "triggered": triggered, "detail": detail})
+
+    chk("shariah", "Shariah status", shariah_status == "NON_COMPLIANT",
+        "NON-COMPLIANT under the selected methodology; review the holding and purification"
+        if shariah_status == "NON_COMPLIANT" else f"Status: {(shariah_status or 'not screened').replace('_', ' ')}")
+    chk("stop_hit", "Stop", None if stop is None else close <= stop,
+        "No stop set" if stop is None else f"Close {close:,.2f} vs stop {stop:,.2f}")
+    chk("target_hit", "Target reached", None if target is None else close >= target,
+        "No target set" if target is None else f"Close {close:,.2f} vs target {target:,.2f}")
+    low20 = min(lo[i - 20:i]) if i >= 20 else None
+    chk("breakdown", "Breakdown below the prior 20-session low", None if low20 is None else close < low20,
+        "Needs 21 bars" if low20 is None else f"Close {close:,.2f} vs 20-session low {low20:,.2f}")
+    if s50 is None or s200 is None:
+        chk("trend_reversal", "Trend reversal", None, "Needs 200 bars")
+    else:
+        bearish = close < s50 < s200
+        chk("trend_reversal", "Trend reversal", bearish,
+            f"Close {close:,.2f}, SMA50 {s50:,.2f}, SMA200 {s200:,.2f}"
+            + (" (close below SMA50 below SMA200)" if bearish else ""))
+    highs = [s for s in sw if s.kind == "high"][-2:]
+    if len(highs) == 2 and rsi[highs[0].index] is not None and rsi[highs[1].index] is not None:
+        a, b = highs
+        div = b.price > a.price and rsi[b.index] < rsi[a.index] and rsi[a.index] >= 70
+        chk("bearish_divergence", "Overbought bearish divergence", div,
+            f"Swing highs {a.price:,.2f} then {b.price:,.2f}; RSI {rsi[a.index]:.1f} then {rsi[b.index]:.1f}")
+    else:
+        chk("bearish_divergence", "Overbought bearish divergence", None, "Fewer than two confirmed swing highs")
+    if stop is not None and target is not None and stop < close < target:
+        rem = (target - close) / (close - stop)
+        chk("rr_deterioration", "Remaining reward-to-risk below 1 : 1", rem < 1,
+            f"{rem:.2f} : 1 from the close to your target and stop")
+    else:
+        chk("rr_deterioration", "Remaining reward-to-risk below 1 : 1", None,
+            "Needs a stop below and a target above the close")
+    qty = float(position.get("quantity") or 0)
+    pos_out = {"quantity": qty, "avg_entry": entry, "stop": stop, "target": target, "close": close,
+               "unrealised": (close - entry) * qty, "unrealised_pct": (close / entry - 1) * 100 if entry else None}
+    return checks, pos_out
+
+
+def _position_summary(stype, checks, pos) -> str:
+    pl = pos.get("unrealised_pct")
+    head = f"Open position {'+' if (pl or 0) >= 0 else ''}{pl:.2f}% from the average entry. " if pl is not None else ""
+    if stype == "SELL_EXIT":
+        return head + "Exit conditions met: " + ", ".join(x["label"].lower() for x in checks if x["triggered"]) + "."
+    return head + "No exit condition is met, so the holding is rated HOLD."
 
 
 def _summary(stype, score, coverage, close, prior_high, rr, el, eh, stop, targets) -> str:

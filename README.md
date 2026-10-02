@@ -85,6 +85,14 @@ Status badges: **END-OF-DAY** means the latest expected close is stored. **STALE
 - **Settings → Shariah methodologies:** copy a built-in methodology, edit its limits, denominator and excluded activities, and make it your default.
 - Enter amounts in full units, or pick "Thousands" in the form when copying from NGX reports stated in NGN '000.
 
+## Watchlists, portfolio and alerts (Phase 5)
+
+- **Stock page:** tick a watchlist, add a position, or create an alert. A held stock shows HOLD or SELL / EXIT with every exit check, and the chart draws your entry, stop and target.
+- **Watchlist:** several named lists with last close, data status, Shariah status, latest signal and your note. Opening it spends no EODHD calls.
+- **Portfolio:** positions you enter by hand, with value, P/L, distance to stop and target, exposure by sector and market, and closed positions with realised P/L. Totals are per currency; nothing is converted because no FX source is connected.
+- **Alerts:** price, RSI, score, signal-change, entry-zone and Shariah-change alerts. They show in the app (bell in the header), as a browser notification while the app is open, and by email if SMTP is set.
+- **Daily job (hosted):** set `CRON_SECRET` in Vercel to let the weekday 20:00 WAT job refresh your stocks and check alerts. Set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` for email.
+
 ## Data providers
 
 Add keys to `.env` to enable a provider. Keys stay on the server and are never sent to the browser. Until a provider is connected and has fetched successfully, the UI shows **UNAVAILABLE** rather than any estimate. EODHD is implemented; FMP, Twelve Data, the official NGX API and CSV import are interface stubs that report "not configured". See §5 of the architecture document for free and paid options and their limits.

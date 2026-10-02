@@ -22,6 +22,8 @@ from app.engines.signals import (
 )
 from app.models.entities import (
     Exchange,
+    Portfolio,
+    PortfolioPosition,
     PriceHistory,
     Signal,
     SignalType,
@@ -90,6 +92,26 @@ def shariah_status(db: Session, stock: Stock, user: User | None) -> str | None:
     return None if st == "NOT_SCREENED" else st
 
 
+def open_position(db: Session, stock: Stock, user: User | None) -> dict | None:
+    """The user's open holding in a stock, combined across portfolios: summed quantity, weighted average
+    entry, the highest stop (the first to be hit) and the lowest target. None when nothing is open."""
+    if user is None:
+        return None
+    rows = db.scalars(select(PortfolioPosition).join(Portfolio).where(
+        Portfolio.user_id == user.id, PortfolioPosition.stock_id == stock.id,
+        PortfolioPosition.closed_at.is_(None))).all()
+    if not rows:
+        return None
+    qty = sum(float(r.quantity) for r in rows)
+    if qty <= 0:
+        return None
+    entry = sum(float(r.quantity) * float(r.avg_entry) for r in rows) / qty
+    stops = [float(r.stop) for r in rows if r.stop is not None]
+    targets = [float(r.target) for r in rows if r.target is not None]
+    return {"quantity": qty, "avg_entry": entry, "stop": max(stops) if stops else None,
+            "target": min(targets) if targets else None, "positions": len(rows)}
+
+
 def analyze(db: Session, stock: Stock, user: User | None = None, persist: bool = True,
             regime_cache: dict | None = None) -> tuple[dict, SignalResult, Strategy] | None:
     bars = load_bars(db, stock.id)
@@ -104,17 +126,18 @@ def analyze(db: Session, stock: Stock, user: User | None = None, persist: bool =
         if regime_cache is not None:
             regime_cache[market] = rg
     sh = shariah_status(db, stock, user)
+    pos = open_position(db, stock, user)
     status, note = freshness(stock, bars[-1]["t"])
     extra = [f"Price data is {status.value.replace('_', '-')}: {note}"] if status.value == "STALE" and note else []
     key = (stock.id, bars[-1]["t"], len(bars), json.dumps(strat.weights, sort_keys=True),
-           (rg or {}).get("label"), sh, status.value)
+           (rg or {}).get("label"), sh, status.value, json.dumps(pos, sort_keys=True))
     if key in _cache:
         data, result = _cache[key]
     else:
         data = compute(bars)
         result = evaluate(data, weights=strat.weights, params=DEFAULT_PARAMS,
                           currency=stock.currency or stock.exchange.currency, market_regime=rg,
-                          shariah_status=sh, extra_warnings=extra)
+                          shariah_status=sh, extra_warnings=extra, position=pos)
         result.timeframes["weekly"] = weekly_trend(bars)
         result.timeframes["agreement"] = agreement(result.timeframes)
         result.snapshot["regime"] = rg

@@ -61,6 +61,19 @@ class Settings(BaseSettings):
 
     display_timezone: str = "Africa/Lagos"
 
+    # Email alerts (optional): any SMTP service, e.g. Gmail with an app password. Empty host = email off.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_starttls: bool = True
+
+    # Daily job (Vercel Cron sends "Authorization: Bearer <CRON_SECRET>"). Empty = the job endpoint is off.
+    cron_secret: str | None = None
+    cron_refresh_max: int = 10  # stocks refreshed per run at most
+    cron_call_reserve: int = 4  # EODHD calls always left for your own browsing
+
     # Hosted mode: the backend also serves the built React app from this folder (one URL, same origin).
     static_dir: str | None = None
 

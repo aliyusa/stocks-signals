@@ -128,6 +128,8 @@ export interface SignalResult {
   supports: { price: number; touches: number }[]; resistances: { price: number; touches: number }[];
   snapshot: Record<string, number | string | boolean | null> & { regime?: Regime | null };
   timeframes: Record<string, string>; summary: string;
+  exit_checks: { code: string; label: string; triggered: boolean | null; detail: string }[];
+  position: { quantity: number; avg_entry: number; stop: number | null; target: number | null; close: number; unrealised: number; unrealised_pct: number | null } | null;
 }
 
 export interface IndicatorSeries {
@@ -221,4 +223,46 @@ export interface ScreenerRow {
 }
 export interface ScreenerResponse {
   methodology: Methodology; market: string; total: number; counts: Record<ShariahStatus, number>; results: ScreenerRow[]; note: string;
+}
+
+// ---------- Phase 5: watchlists, portfolio, alerts ----------
+export interface StockRef { exchange: string; ticker: string; name?: string | null }
+
+export interface WatchRow {
+  ticker: string; name: string; exchange: string; market: string; currency: string | null; sector: string | null;
+  quote: Quote; shariah: ShariahStatus; note: string | null; added_at: string;
+  signal: { type: SignalType; score: number | null; data_as_of: string; computed_at: string } | null;
+}
+export interface WatchlistsResponse { watchlists: { id: number; name: string; created_at: string; items: WatchRow[] }[]; methodology: string }
+
+export interface ExitCheck { code: string; label: string; triggered: boolean | null; detail: string }
+
+export interface PositionRow {
+  id: number; ticker: string; name: string; exchange: string; market: string; sector: string | null; currency: string;
+  quantity: number; avg_entry: number; cost: number; stop: number | null; target: number | null; opened_at: string | null;
+  note: string | null; closed_at: string | null; exit_price: number | null; quote: Quote; shariah: ShariahStatus;
+  value: number | null; pl: number | null; pl_pct: number | null; to_stop_pct?: number | null; to_target_pct?: number | null;
+  signal?: { type: SignalType; summary: string; as_of: string; triggered: ExitCheck[] } | null;
+}
+export interface PortfolioData {
+  id: number; name: string; base_currency: string; created_at: string; open: PositionRow[]; closed: PositionRow[];
+  totals: Record<string, { cost: number; value: number; unrealised: number; realised: number; priced: number; unpriced: number }>;
+  exposure: Record<string, Record<"sector" | "market", { name: string; value: number; share: number }[]>>;
+  warnings: string[];
+}
+export interface PortfoliosResponse { portfolios: PortfolioData[]; methodology: string; note: string }
+
+export interface AlertCondition { type: string; level?: number; value?: number; signal?: SignalType }
+export interface AlertRow {
+  id: number; name: string; condition: AlertCondition; description: string; channels: string[]; cooldown_minutes: number;
+  is_active: boolean; last_triggered_at: string | null; last_evaluated_at: string | null; last_result: boolean | null;
+  last_message: string | null; created_at: string; stock: { ticker: string; name: string; exchange: string } | null;
+}
+export interface AlertEventRow {
+  id: number; alert_id: number; triggered_at: string; is_read: boolean; browser: boolean; delivered: Record<string, string>;
+  payload: { title: string; message: string; condition: string; ticker: string; exchange: string; bar_date: string | null };
+}
+export interface AlertOptions {
+  conditions: { type: string; label: string; param: "level" | "value" | "signal" | null }[]; signal_types: SignalType[];
+  channels: Record<string, boolean>; daily_job: boolean; note: string;
 }

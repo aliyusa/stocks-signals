@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { MARKETS, useMarket } from "../lib/market";
+import AlertBell from "./AlertBell";
 import SearchBox from "./SearchBox";
 import { Disclaimer } from "./ui";
 
@@ -102,6 +103,7 @@ export default function Layout() {
               </button>
             ))}
           </div>
+          <AlertBell />
           <span className="hidden text-xs text-ink-400 sm:inline">{user?.full_name || user?.email}</span>
           <button onClick={logout} className="rounded-md p-1.5 text-ink-400 hover:bg-ink-800 hover:text-ink-100" aria-label="Log out" title="Log out">
             <LogOut size={16} />

@@ -183,9 +183,34 @@ export function Snapshot({ s, currency }: { s: SignalResult; currency: string | 
   );
 }
 
+export function ExitChecks({ s, currency }: { s: SignalResult; currency: string | null }) {
+  const p = s.position!;
+  return (
+    <div className="space-y-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-5">
+        <div><dt className="text-ink-500">Quantity</dt><dd className="num">{fmtNum(p.quantity, 0)}</dd></div>
+        <div><dt className="text-ink-500">Average entry</dt><dd className="num">{fmtMoney(p.avg_entry, currency)}</dd></div>
+        <div><dt className="text-ink-500">Unrealised</dt><dd className={`num ${p.unrealised >= 0 ? "text-up" : "text-down"}`}>{fmtMoney(p.unrealised, currency)} ({p.unrealised_pct == null ? "n/a" : `${fmtNum(p.unrealised_pct, 2)}%`})</dd></div>
+        <div><dt className="text-ink-500">Your stop</dt><dd className="num">{p.stop == null ? "Not set" : fmtMoney(p.stop, currency)}</dd></div>
+        <div><dt className="text-ink-500">Your target</dt><dd className="num">{p.target == null ? "Not set" : fmtMoney(p.target, currency)}</dd></div>
+      </dl>
+      <ul className="divide-y divide-ink-800 text-xs">
+        {s.exit_checks.map((x) => (
+          <li key={x.code} className="flex gap-2 py-1.5">
+            <span className="mt-0.5">{x.triggered === true ? <AlertTriangle size={14} className="text-red-400" aria-label="Triggered" /> : x.triggered === false ? <Check size={14} className="text-emerald-400" aria-label="Not triggered" /> : <Minus size={14} className="text-ink-500" aria-label="Not evaluated" />}</span>
+            <div><p className="text-ink-100">{x.label}{x.triggered ? " · exit condition met" : ""}</p><p className="text-ink-400">{x.detail}</p></div>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-ink-500">Combined across your open positions in this stock: summed quantity, weighted average entry, the highest stop and the lowest target.</p>
+    </div>
+  );
+}
+
 export function AnalysisGrid({ s, currency, strategy }: { s: SignalResult; currency: string | null; strategy: string }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {s.position && <Card title="Your position · exit checks" className="lg:col-span-3"><ExitChecks s={s} currency={currency} /></Card>}
       <Card title="Technical signal" className="lg:col-span-2"><SignalSummary s={s} currency={currency} strategy={strategy} /></Card>
       <Card title="Warnings"><Warnings s={s} /></Card>
       <Card title="Levels" className="lg:col-span-2"><LevelsTable s={s} currency={currency} /></Card>

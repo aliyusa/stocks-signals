@@ -32,7 +32,7 @@ export function fmtDate(iso: string | null | undefined, empty = "n/a"): string {
 
 export function fmtMoney(v: number | null | undefined, currency: string | null | undefined): string {
   if (v === null || v === undefined) return "Data unavailable";
-  const digits = Math.abs(v) >= 1000 ? 2 : Math.abs(v) >= 1 ? 2 : 4;
+  const digits = Math.abs(v) >= 1 || v === 0 ? 2 : 4;
   return `${currency && currency !== "XXX" ? currency + " " : ""}${fmtNum(v, digits)}`;
 }
 

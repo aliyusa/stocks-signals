@@ -1,6 +1,6 @@
 # Halal Stock Signals: Architecture and Roadmap
 
-Version 0.4 (Phase 4) · 01 Oct 2026
+Version 0.5 (Phase 5) · 02 Oct 2026
 
 Guiding principle: **DATA → ANALYSIS → SIGNAL → EXPLANATION**. The platform never places trades. Every number it shows carries a source, a timestamp, a frequency and a status. When a value is missing, the platform says "Data unavailable" and does not substitute an estimate.
 
@@ -66,8 +66,8 @@ PostgreSQL with SQLAlchemy 2.0 ORM and Alembic migrations. All timestamps are st
 | `strategies` | id, user_id, name, description, rules (JSONB), weights (JSONB), level_method, is_builtin | |
 | `signals` | id, stock_id, strategy_id, interval, ts, signal_type (BUY_SETUP, SELL_EXIT, HOLD, WAIT, AVOID, WATCHLIST), score, score_breakdown (JSONB), reasons (JSONB), warnings (JSONB), entry_low, entry_high, stop, target1..3, rr, data_as_of | Immutable once written |
 | `watchlists` / `watchlist_stocks` | user_id, name / watchlist_id, stock_id, added_at, note | |
-| `portfolios` / `portfolio_positions` | user_id, name, base_currency / portfolio_id, stock_id, quantity, avg_entry, stop, target, opened_at | Manual entry only |
-| `alerts` | id, user_id, stock_id (nullable), condition (JSONB), channels (JSONB), is_active, last_triggered_at, cooldown_minutes | |
+| `portfolios` / `portfolio_positions` | user_id, name, base_currency / portfolio_id, stock_id, quantity, avg_entry, stop, target, opened_at, closed_at, exit_price | Manual entry only |
+| `alerts` | id, user_id, stock_id, condition (JSONB), channels (JSONB), is_active, last_triggered_at, last_evaluated_at, state (JSONB), cooldown_minutes | |
 | `alert_events` | alert_id, triggered_at, payload (JSONB), delivered (JSONB) | |
 | `backtests` | id, user_id, strategy_id, universe (JSONB), start, end, costs_bps, slippage_bps, metrics (JSONB), trades (JSONB), status, created_at | |
 | `news` | id, stock_id, source_id, published_at, title, url, summary | |
@@ -114,7 +114,7 @@ Rules whose inputs are unavailable are excluded, and the score is renormalised o
 The classification is evaluated in order, and the first match wins:
 
 1. **AVOID**: Shariah status is NON-COMPLIANT, or the liquidity category fails.
-2. **SELL / EXIT**: an open position meets a stop, breakdown, trend-reversal, overbought-divergence or R:R-deterioration condition. The reason code is always shown.
+2. **SELL / EXIT**: an open position meets an exit condition. Each check is listed with its value: Shariah status NON-COMPLIANT, close at or below your stop, close at or above your target, close below the prior 20-session low (breakdown), close below SMA50 below SMA200 (trend reversal), a higher swing high with a lower RSI after RSI was at least 70 (bearish divergence), and remaining reward-to-risk below 1 : 1. Several positions in one stock are combined: summed quantity, weighted average entry, the highest stop and the lowest target.
 3. **BUY SETUP**: score ≥ 70, the trend and price-action categories each ≥ 60%, R:R ≥ the user minimum, and no blocking warning.
 4. **WATCHLIST**: score from 55 to 69, or BUY conditions met while confirmation (breakout close, volume) is pending.
 5. **HOLD**: a position is open and no exit condition is met.
@@ -138,6 +138,14 @@ Phase 3 implements the structure + ATR method below. Other methods (percentage, 
 - The universe is point-in-time: stocks with `delisted_at` inside the window are kept.
 - Point-in-time Shariah status uses the fundamentals `reported_at` date, not `period_end`.
 - Reported metrics: trades, wins, losses, win rate, average gain and loss, profit factor, maximum drawdown, average R, total and annualised return, and exposure.
+
+[Back to top](#contents)
+
+### 3.6 Alerts
+
+Conditions: close at or above or below a price, RSI at or above or below a value, setup score at or above a value, the signal changing to a type, the close inside the entry zone, and a change of Shariah status. Alerts read stored data only. They are checked when new bars arrive for a stock, when you press Check now, and by the daily job. A price, RSI, score or entry-zone alert fires at most once per bar and once per cooldown (1 hour to 1 week). Delivery: an in-app event (always), a browser notification while the app is open, and email when SMTP is configured. There is no background push service, so a closed browser shows nothing until the app is next opened.
+
+**Daily job.** On Vercel, `vercel.json` schedules `/api/cron/daily` on weekdays at 19:00 UTC (20:00 WAT; the Hobby plan runs it within that hour). It refreshes stocks with alerts, then open positions, then watchlist stocks, at most `CRON_REFRESH_MAX` and always leaving `CRON_CALL_RESERVE` EODHD calls unused, and then evaluates every alert. It runs only when `CRON_SECRET` is set; Vercel sends it as a bearer token.
 
 [Back to top](#contents)
 
@@ -288,7 +296,7 @@ halal-stock-signals/
 | **2** (done: EODHD) | Provider layer (EODHD done; FMP, Twelve Data, CSV pending), search, stock page, candlestick chart | Load DANGCEM from CSV or EODHD and MSFT from FMP, each with correct badges |
 | **3** (done) | Indicator engine, signal engine, market regime, scanner, Signals page, editable score weights, chart overlays and RSI/MACD panes | Unit tests against reference values; scanner returns explainable matches |
 | **4** (done) | Shariah engine, methodology editor, "Why?" panel, manual fundamentals entry, Shariah screener | Each status is reachable in tests; missing data yields INSUFFICIENT DATA |
-| 5 | Watchlists, alerts (browser push and email), portfolio | An alert fires once per cooldown |
+| **5** (done) | Watchlists, alerts (in-app, browser notification while open, email), portfolio, HOLD and SELL / EXIT for held stocks, daily job | An alert fires once per cooldown |
 | 6 | Risk calculator, backtester, strategy builder | A no-look-ahead test (shifted-future canary) passes |
 | 7 | AI assistant restricted to system data, with citations | Refuses to answer beyond the stored data |
 | 8 | Test coverage, security review, performance, deployment guide | CI green; OWASP checklist |

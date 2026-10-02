@@ -1,3 +1,4 @@
+import logging
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -31,6 +32,16 @@ def _row(db: Session, s: Stock, with_quote: bool = True) -> dict:
     if with_quote:
         out["quote"] = quote(db, s)
     return out
+
+
+def _check_alerts(db: Session, s: Stock) -> None:
+    """New bars arrived: evaluate alerts on this stock. A failure here never breaks the page."""
+    from app.services.alerts import evaluate_for_stock
+    try:
+        evaluate_for_stock(db, s)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logging.getLogger("hss.alerts").exception("Alert evaluation failed for %s", s.ticker)
 
 
 def _get_stock(db: Session, mic: str, ticker: str) -> Stock:
@@ -90,6 +101,8 @@ def stock_detail(mic: str, ticker: str, refresh: bool = True, _: User = Depends(
         raise HTTPException(422, "Invalid exchange or ticker")
     s = _get_stock(db, mic, ticker)
     result = refresh_bars(db, s, ProviderRegistry(db=db)) if refresh else None
+    if result is not None and result.new_bars:
+        _check_alerts(db, s)
     last = latest_bar(db, s.id)
     return {
         **_row(db, s),
@@ -121,6 +134,8 @@ def force_refresh(request: Request, mic: str, ticker: str, user: User = Depends(
                   db: Session = Depends(get_db)):
     s = _get_stock(db, mic, ticker)
     r = refresh_bars(db, s, ProviderRegistry(db=db), force=True)
+    if r.new_bars:
+        _check_alerts(db, s)
     audit.record(db, "provider.refresh", request, user.id, entity="stock", entity_id=f"{mic}:{s.ticker}",
                  details={"status": r.status, "new": r.new_bars, "message": r.message})
     return {"status": r.status, "new_bars": r.new_bars, "message": r.message, "quote": quote(db, s),

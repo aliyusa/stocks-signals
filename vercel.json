@@ -10,5 +10,11 @@
   },
   "regions": [
     "dub1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 19 * * 1-5"
+    }
   ]
 }
