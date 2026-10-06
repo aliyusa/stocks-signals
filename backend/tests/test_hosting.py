@@ -37,6 +37,14 @@ def test_spa_served_with_security_headers(tmp_path, monkeypatch):
         assert c.get("/api/nope").status_code == 404  # unknown API paths are not swallowed by the SPA
         assert c.get("/api/health").json()["status"] in ("ok", "degraded")
         assert "strict-transport-security" in c.get("/", headers={"x-forwarded-proto": "https"}).headers
+        # The page's ETag follows its content, so a new build is never answered with "304 Not Modified".
+        first = c.get("/")
+        etag = first.headers["etag"]
+        assert first.headers["cache-control"] == "no-cache"
+        assert c.get("/", headers={"If-None-Match": etag}).status_code == 304
+        (tmp_path / "index.html").write_text("<!doctype html><title>HSS v2</title>")  # same mtime is irrelevant
+        fresh = c.get("/", headers={"If-None-Match": etag})
+        assert fresh.status_code == 200 and "v2" in fresh.text and fresh.headers["etag"] != etag
     finally:
         monkeypatch.delenv("STATIC_DIR")
         config.get_settings.cache_clear()

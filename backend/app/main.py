@@ -1,9 +1,10 @@
+import hashlib
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -81,10 +82,17 @@ if settings.static_dir and Path(settings.static_dir, "index.html").is_file():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
     @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
-    def spa(path: str):
+    def spa(path: str, request: Request):
         if path.startswith("api/"):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         f = (_static / path).resolve()
         if path and f.is_file() and f.is_relative_to(_static):  # no path traversal outside the build folder
             return FileResponse(f)
-        return FileResponse(_static / "index.html", headers={"Cache-Control": "no-cache"})
+        # index.html is read from disk and tagged by its content: Vercel gives every deployment's files the same
+        # timestamp, so a size+mtime ETag would let browsers keep an old page that points at deleted assets.
+        body = (_static / "index.html").read_bytes()
+        etag = '"' + hashlib.sha256(body).hexdigest()[:32] + '"'
+        if etag in request.headers.get("if-none-match", ""):
+            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+        return Response(body, media_type="text/html; charset=utf-8",
+                        headers={"ETag": etag, "Cache-Control": "no-cache"})
