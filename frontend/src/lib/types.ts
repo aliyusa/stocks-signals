@@ -266,3 +266,46 @@ export interface AlertOptions {
   conditions: { type: string; label: string; param: "level" | "value" | "signal" | null }[]; signal_types: SignalType[];
   channels: Record<string, boolean>; daily_job: boolean; note: string;
 }
+
+// ---------- Phase 6: strategies, backtests, risk ----------
+export interface ExitConfig { stop: "signal" | "atr"; stop_atr: number; target: "signal" | "r_multiple" | "none"; target_r: number; max_hold_days: number; exit_on: string[] }
+export interface StrategyRow {
+  id: number; name: string; description: string | null; is_builtin: boolean; is_active: boolean;
+  weights: Record<string, number>; params: Record<string, number>; disabled: string[]; entry_on: string[]; exit: ExitConfig; created_at: string;
+}
+export interface StrategyCatalogue {
+  rules: { id: string; category: string; category_label: string; label: string }[];
+  categories: Record<string, string>; default_weights: Record<string, number>;
+  params: { key: string; label: string; min: number; max: number; default: number }[];
+  exit_defaults: ExitConfig; exit_checks: Record<string, string>; entry_types: string[];
+  cost_presets: Record<string, { label: string; commission_bps: number; slippage_bps: number }>;
+}
+export interface BtMetrics {
+  trades: number; wins: number; losses: number; win_rate: number | null; avg_gain_pct: number | null; avg_loss_pct: number | null;
+  profit_factor: number | null; max_drawdown_pct: number; avg_r: number | null; total_return_pct: number; annualised_return_pct: number;
+  exposure_pct: number; buy_hold_return_pct: number; buy_hold_max_drawdown_pct: number; start: string; end: string; bars: number;
+  final_equity: number; capital: number; skipped: Record<string, number>; open_at_end: Record<string, number | string> | null;
+  equity: { t: string; v: number; bh: number }[];
+}
+export interface BtTrade {
+  ticker: string; exchange: string; currency: string; signal_date: string; entry_date: string; entry: number; shares: number;
+  stop: number; target: number | null; exit_date: string; exit: number; reason: string; pl: number; pl_pct: number;
+  bars_held: number; r_multiple: number | null; score: number | null;
+}
+export interface BtSummary {
+  stocks: number; trades: number; wins: number; losses: number; win_rate: number | null; avg_gain_pct: number | null;
+  avg_loss_pct: number | null; profit_factor_pct_basis: number | null; avg_r: number | null; avg_total_return_pct: number;
+  avg_buy_hold_return_pct: number; worst_drawdown_pct: number; avg_exposure_pct: number;
+}
+export interface BacktestResult {
+  id: number; strategy_id: number; strategy: string; start: string; end: string; status: string; created_at: string;
+  stocks: string[]; summary: BtSummary;
+  universe?: { settings: Record<string, string | number>; shariah_methodology: string | null };
+  metrics?: { summary: BtSummary; per_stock: { ticker: string; exchange: string; currency: string; ok: boolean; error?: string; metrics?: BtMetrics }[]; notes: string[]; limitations: string[] };
+  trades?: BtTrade[];
+}
+export interface RiskResult {
+  ok: boolean; errors?: string[]; shares?: number; position_value?: number; position_pct?: number; entry_costs?: number;
+  risk_amount_allowed?: number; loss_per_share?: number; loss_at_stop?: number; loss_at_stop_pct?: number; stop_distance_pct?: number;
+  capped_by?: string | null; steps?: string[]; warnings?: string[]; gain_at_target?: number; reward_risk?: number | null;
+}

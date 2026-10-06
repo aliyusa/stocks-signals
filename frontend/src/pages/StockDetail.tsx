@@ -204,6 +204,15 @@ export default function StockDetail() {
               <span className="text-ink-300">Setup score</span>
               <span className="num">{sig?.score != null ? `${sig.score.toFixed(0)}/100` : "n/a"}</span>
             </li>
+            {sig && sig.stop !== null && sig.entry_low !== null && sig.entry_high !== null && (
+              <li className="flex items-center justify-between gap-2">
+                <span className="text-ink-300">Position size</span>
+                <Link className="text-xs text-brand-500 hover:underline"
+                  to={`/risk?mic=${mic}&ticker=${encodeURIComponent(ticker)}&currency=${d.currency ?? ""}&entry=${((sig.entry_low + sig.entry_high) / 2).toFixed(2)}&stop=${sig.stop.toFixed(2)}${sig.targets[0]?.price != null ? `&target=${sig.targets[0].price.toFixed(2)}` : ""}`}>
+                  Size this setup
+                </Link>
+              </li>
+            )}
           </ul>
           <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
             {analysis.data && !analysis.data.available ? analysis.data.reason + " " : ""}

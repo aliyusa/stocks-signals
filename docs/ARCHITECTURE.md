@@ -1,6 +1,6 @@
 # Halal Stock Signals: Architecture and Roadmap
 
-Version 0.5 (Phase 5) · 02 Oct 2026
+Version 0.6 (Phase 6) · 06 Oct 2026
 
 Guiding principle: **DATA → ANALYSIS → SIGNAL → EXPLANATION**. The platform never places trades. Every number it shows carries a source, a timestamp, a frequency and a status. When a value is missing, the platform says "Data unavailable" and does not substitute an estimate.
 
@@ -137,7 +137,15 @@ Phase 3 implements the structure + ATR method below. Other methods (percentage, 
 - Costs (commission in basis points, plus NGX statutory fees as a configurable preset) are charged on both sides.
 - The universe is point-in-time: stocks with `delisted_at` inside the window are kept.
 - Point-in-time Shariah status uses the fundamentals `reported_at` date, not `period_end`.
-- Reported metrics: trades, wins, losses, win rate, average gain and loss, profit factor, maximum drawdown, average R, total and annualised return, and exposure.
+- Reported metrics: trades, wins, losses, win rate, average gain and loss, profit factor, maximum drawdown, average R, total and annualised return, exposure, and buy-and-hold return and drawdown for comparison.
+- Implemented in `engines/backtest.py` (Phase 6). The shifted-future canary test replaces every bar after a cut-off with shifted, reversed prices and checks that every signal and trade before the cut-off is identical.
+- Stops and targets fill intrabar at their level, or at the open when the bar gaps through; when one bar touches both, the stop is assumed first. Signal exits (breakdown, trend reversal, divergence) and the time exit fill at the next open.
+- Cost presets: NGX typical broker 2% a side plus 0.25% slippage, NGX low-cost app 1.15% a side, US commission-free 0.05% slippage. The NGX figures are estimates from a published round-trip of about 4% to 4.5% (nairacompare.ng); check them against your broker's contract note.
+- Not yet: the market-regime rule is not evaluated in backtests, business-activity tags are today's, and delisted stocks are not added to the universe automatically.
+
+### 3.7 Strategies and position sizing
+
+A strategy stores category weights, thresholds (BUY SETUP and WATCHLIST scores, minimum R:R, coverage, RSI band, volume ratio, flat-bar limit), rules switched off, the entry signal types and the backtest exit rules. The strategy a user activates drives every signal. The risk calculator sizes a long position so that a fall to the stop, including costs on both sides, loses at most the chosen share of the account, rounded down to the lot size and capped by a maximum position share.
 
 [Back to top](#contents)
 
@@ -297,7 +305,7 @@ halal-stock-signals/
 | **3** (done) | Indicator engine, signal engine, market regime, scanner, Signals page, editable score weights, chart overlays and RSI/MACD panes | Unit tests against reference values; scanner returns explainable matches |
 | **4** (done) | Shariah engine, methodology editor, "Why?" panel, manual fundamentals entry, Shariah screener | Each status is reachable in tests; missing data yields INSUFFICIENT DATA |
 | **5** (done) | Watchlists, alerts (in-app, browser notification while open, email), portfolio, HOLD and SELL / EXIT for held stocks, daily job | An alert fires once per cooldown |
-| 6 | Risk calculator, backtester, strategy builder | A no-look-ahead test (shifted-future canary) passes |
+| **6** (done) | Risk calculator, backtester, strategy builder | A no-look-ahead test (shifted-future canary) passes |
 | 7 | AI assistant restricted to system data, with citations | Refuses to answer beyond the stored data |
 | 8 | Test coverage, security review, performance, deployment guide | CI green; OWASP checklist |
 

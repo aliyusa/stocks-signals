@@ -93,6 +93,12 @@ Status badges: **END-OF-DAY** means the latest expected close is stored. **STALE
 - **Alerts:** price, RSI, score, signal-change, entry-zone and Shariah-change alerts. They show in the app (bell in the header), as a browser notification while the app is open, and by email if SMTP is set.
 - **Daily job (hosted):** set `CRON_SECRET` in Vercel to let the weekday 20:00 WAT job refresh your stocks and check alerts. Set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` for email.
 
+## Strategies, backtests and risk (Phase 6)
+
+- **Strategies:** copy the built-in strategy, then change weights, switch rules off, set thresholds and choose how backtests exit. "Use for signals" makes it drive every signal.
+- **Backtesting:** replay a strategy on up to 10 stocks' stored prices, with NGX cost presets and a point-in-time Shariah filter. Results show return against buy and hold, drawdown, win rate, profit factor, an equity curve and every trade.
+- **Risk Calculator:** shares to buy for a chosen risk per trade, with costs, lot size and a position cap. "Size this setup" on a stock page fills in the entry, stop and target.
+
 ## Data providers
 
 Add keys to `.env` to enable a provider. Keys stay on the server and are never sent to the browser. Until a provider is connected and has fetched successfully, the UI shows **UNAVAILABLE** rather than any estimate. EODHD is implemented; FMP, Twelve Data, the official NGX API and CSV import are interface stubs that report "not configured". See §5 of the architecture document for free and paid options and their limits.

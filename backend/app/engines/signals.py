@@ -145,6 +145,7 @@ def evaluate(
     shariah_status: str | None = None,
     extra_warnings: list[str] | None = None,
     position: dict | None = None,
+    disabled_rules: set[str] | frozenset[str] = frozenset(),
 ) -> SignalResult:
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
     p = {**DEFAULT_PARAMS, **(params or {})}
@@ -302,12 +303,17 @@ def evaluate(
          None if flat_share is None else f"{flat_share:.0%}", "Flat bars mean no intraday trading range")
 
     # ---------- score ----------
+    # Rules switched off in a strategy stay listed for transparency but carry no weight.
+    for x in rules:
+        if x.id in disabled_rules:
+            x.passed, x.detail = None, "Switched off in this strategy"
+    scored_rules = [x for x in rules if x.id not in disabled_rules]
     breakdown = {}
     total_w = sum(w.values()) or 1
     evaluated_w = scored = 0.0
     coverage_w = 0.0
     for cat, weight in w.items():
-        cr = [x for x in rules if x.category == cat]
+        cr = [x for x in scored_rules if x.category == cat]
         appl = [x for x in cr if x.passed is not None]
         passed = [x for x in appl if x.passed]
         pct = (len(passed) / len(appl)) if appl else None
@@ -318,8 +324,10 @@ def evaluate(
             evaluated_w += weight
             scored += pts
             coverage_w += weight * len(appl) / len(cr)
+        elif not cr:
+            total_w -= weight  # every rule in the category is switched off: it no longer counts
     score = (scored / evaluated_w * 100) if evaluated_w else None
-    coverage = coverage_w / total_w
+    coverage = coverage_w / total_w if total_w > 0 else 0.0
 
     # ---------- classification ----------
     reasons: list[str] = []

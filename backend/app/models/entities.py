@@ -88,6 +88,9 @@ class User(Base):
     shariah_methodology_id: Mapped[int | None] = mapped_column(
         ForeignKey("shariah_methodologies.id", ondelete="SET NULL", use_alter=True,
                    name="fk_users_shariah_methodology"))  # None = built-in default
+    active_strategy_id: Mapped[int | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL", use_alter=True,
+                   name="fk_users_active_strategy"))  # None = "My scoring weights" or the built-in default
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(TS)
     created_at: Mapped[datetime] = _now_col()

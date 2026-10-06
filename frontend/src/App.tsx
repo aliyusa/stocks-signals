@@ -12,6 +12,9 @@ import Shariah from "./pages/Shariah";
 import Watchlist from "./pages/Watchlist";
 import Portfolio from "./pages/Portfolio";
 import Alerts from "./pages/Alerts";
+import Risk from "./pages/Risk";
+import Strategies from "./pages/Strategies";
+import Backtesting from "./pages/Backtesting";
 import StockDetail from "./pages/StockDetail";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -36,7 +39,10 @@ export default function App() {
         <Route path="watchlist" element={<Watchlist />} />
         <Route path="portfolio" element={<Portfolio />} />
         <Route path="alerts" element={<Alerts />} />
-        {NAV.filter((n) => !["/", "/settings", "/markets", "/scanner", "/signals", "/shariah", "/watchlist", "/portfolio", "/alerts"].includes(n.to)).map((n) => (
+        <Route path="risk" element={<Risk />} />
+        <Route path="strategies" element={<Strategies />} />
+        <Route path="backtesting" element={<Backtesting />} />
+        {NAV.filter((n) => !["/", "/settings", "/markets", "/scanner", "/signals", "/shariah", "/watchlist", "/portfolio", "/alerts", "/risk", "/strategies", "/backtesting"].includes(n.to)).map((n) => (
           <Route key={n.to} path={n.to.slice(1)} element={<ComingSoon path={n.to} />} />
         ))}
         <Route path="*" element={<Navigate to="/" replace />} />

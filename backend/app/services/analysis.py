@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.engines import regime as regime_engine
+from app.engines import strategy as strategy_engine
 from app.engines.signals import (
-    DEFAULT_PARAMS,
     DEFAULT_WEIGHTS,
     SignalResult,
     agreement,
@@ -60,6 +60,11 @@ def default_strategy(db: Session) -> Strategy:
 
 
 def user_strategy(db: Session, user: User | None) -> Strategy:
+    """The strategy behind this user's signals: the one they activated, else their weights, else the default."""
+    if user is not None and user.active_strategy_id:
+        s = db.get(Strategy, user.active_strategy_id)
+        if s is not None and (s.is_builtin or s.user_id == user.id):
+            return s
     if user is not None:
         s = db.scalar(select(Strategy).where(Strategy.user_id == user.id, Strategy.name == USER_STRATEGY))
         if s is not None:
@@ -129,13 +134,14 @@ def analyze(db: Session, stock: Stock, user: User | None = None, persist: bool =
     pos = open_position(db, stock, user)
     status, note = freshness(stock, bars[-1]["t"])
     extra = [f"Price data is {status.value.replace('_', '-')}: {note}"] if status.value == "STALE" and note else []
-    key = (stock.id, bars[-1]["t"], len(bars), json.dumps(strat.weights, sort_keys=True),
+    key = (stock.id, bars[-1]["t"], len(bars), json.dumps([strat.weights, strat.rules], sort_keys=True),
            (rg or {}).get("label"), sh, status.value, json.dumps(pos, sort_keys=True))
     if key in _cache:
         data, result = _cache[key]
     else:
         data = compute(bars)
-        result = evaluate(data, weights=strat.weights, params=DEFAULT_PARAMS,
+        cfg = strategy_engine.config(strat.weights, strat.rules)
+        result = evaluate(data, weights=cfg["weights"], params=cfg["params"], disabled_rules=set(cfg["disabled"]),
                           currency=stock.currency or stock.exchange.currency, market_regime=rg,
                           shariah_status=sh, extra_warnings=extra, position=pos)
         result.timeframes["weekly"] = weekly_trend(bars)
